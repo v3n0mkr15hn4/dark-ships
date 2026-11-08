@@ -7,8 +7,11 @@ import pandas as pd
 import pytest
 
 from darkships.clean import clean
+from darkships.coverage import build_presence_grid, coverage
+from darkships.features import add_required_features
 from darkships.gaps import find_gaps
 from darkships.ingest import select_tracks_and_universe
+from darkships.score import coverage_term
 
 ROOT = Path(__file__).resolve().parents[1]
 DAY = pd.Timestamp("2026-04-15")
@@ -76,3 +79,47 @@ def test_track_ending_at_23_00_has_no_trailing_gap(cfg):
 def test_aton_mmsi_is_removed_by_clean(cfg):
     g = run_gaps(pings(mmsi=993123456, minutes=HOLE), cfg)
     assert len(g) == 0
+
+
+# --- coverage hole (PLAN.md section 10, case 5) -------------------------------------------
+
+def run_coverage(df, cfg):
+    """Gap of vessel X (00:20 -> 00:50, buckets 00:20, 00:30, 00:40) plus its coverage features."""
+    con = duckdb.connect()
+    con.register("raw_df", df)
+    con.execute("CREATE TABLE raw AS SELECT * FROM raw_df")
+    clean(con, cfg)
+    select_tracks_and_universe(con, cfg)
+    build_presence_grid(con, cfg)
+    ev = add_required_features(find_gaps(con, cfg))
+    ev = ev.merge(coverage(con, cfg, ev), on="event_id")
+    assert len(ev) == 1
+    row = ev.iloc[0]
+    c = coverage_term(row["coverage_during_gap"], row["heard_today"], cfg["score"]["quiet_coverage_c"])
+    return row, float(c)
+
+
+X = dict(mmsi=367000001, minutes=HOLE)
+Y = dict(mmsi=367000002, lat=29.01)  # another vessel in the same cell as X
+
+
+def test_other_vessel_heard_during_gap_means_covered(cfg):
+    row, c = run_coverage(pd.concat([pings(**X), pings(**Y, minutes=range(60))]), cfg)
+    assert row["n_buckets"] == 3 and row["coverage_during_gap"] == 1.0 and c == 1.0
+
+
+def test_area_heard_only_outside_gap_is_neutral(cfg):
+    row, c = run_coverage(pd.concat([pings(**X), pings(**Y, minutes=range(60, 70))]), cfg)
+    assert row["coverage_during_gap"] == 0 and row["heard_today"] and c == 0.5
+
+
+def test_no_other_vessel_all_day_is_a_coverage_hole(cfg):
+    # Only X's own pings are in the cells: self-exclusion must not count them as coverage.
+    row, c = run_coverage(pings(**X), cfg)
+    assert row["coverage_during_gap"] == 0 and not row["heard_today"] and c == 0.0
+
+
+def test_weak_coverage_never_scores_below_quiet(cfg):
+    # Y heard in 1 of 3 buckets (00:31-00:35): C = max(1/3, 0.5) = 0.5, monotonic.
+    row, c = run_coverage(pd.concat([pings(**X), pings(**Y, minutes=range(31, 36))]), cfg)
+    assert row["n_buckets_covered"] == 1 and c == 0.5

@@ -1,0 +1,10 @@
+removed,top50_kept,jaccard
+term D,45,0.82
+term C,49,0.96
+term U,34,0.52
+term K,48,0.92
+term T,41,0.69
+suppressor coverage_hole,50,1.0
+suppressor port,30,0.43
+suppressor teleport,50,1.0
+suppressor mmsi_conflict,50,1.0

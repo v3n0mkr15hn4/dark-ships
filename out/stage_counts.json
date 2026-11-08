@@ -7,6 +7,7 @@
   "track_rows": 708414,
   "universe_rows": 906216,
   "universe_vessels": 1498,
+  "grid_cell_buckets": 20104,
   "gaps": 515,
   "gap_vessels": 142
 }
