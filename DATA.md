@@ -21,12 +21,36 @@
 - **Conclusion:** no fog closure and no broken feed, so there is no reason to switch days.
 
 ## 3. Row counts per stage
-| Stage | Rows | Vessels (MMSI) |
-|---|---|---|
-| Raw national file | 7,806,560 | 20,527 |
-| Ship-range MMSI (201000000–775999999) | 7,801,917 | 20,470 |
-| Raw rows inside the bbox | 637,420 | 1,168 (932 Class A, 239 Class B) |
-| *Later stages (clean → tracks → universe → gaps → top 50) are filled in block 2* | | |
+These counts are produced by `python run.py` and written to `out/stage_counts.json`.
+
+| Stage | Rows | Vessels (MMSI) | Dropped because |
+|---|---|---|---|
+| Raw national file | 7,806,560 | 20,527 | – |
+| Ship-range MMSI (201000000–775999999) | 7,801,917 | 20,470 | 4,643 rows from non-ship MMSIs (SART, AtoN, other) |
+| Valid position | 7,801,917 | | 0 rows (no out-of-range or 0,0 positions) |
+| One row per (mmsi, timestamp) | 7,800,124 | | 1,793 duplicate rows (exact and conflicting copies) |
+| Vessels with ≥1 clean ping in the bbox | – | 1,164 | (1,168 raw: 4 non-ship MMSIs) |
+| Their full national-day tracks | 708,414 | 1,164 | |
+| Presence universe (all vessels, bbox ± 0.5°) | 906,216 | 1,498 | |
+| Gaps (K = 10, ≥1 endpoint in the bbox) | 515 | 142 | |
+| *Top 50 and labels: blocks 3–5* | | | |
+
+**Gap-threshold sensitivity** (same tracks, gap if ≥ max(600 s, K × E)):
+
+| K | Gaps |
+|---|---|
+| 5 | 2,030 |
+| **10 (used)** | **515** |
+| 20 | 185 |
+
+**Gap mix at K = 10:**
+- By expected interval: 404 gaps had a slow expected interval (E = 180 s: anchored, moored or slow) and 111 had a fast one (60 s).
+- By class: Class B 377, Class A 138.
+- By vessel group: pleasure/sail 316, fishing 65, tug/tow 56, other 28, tanker 23, cargo 14, passenger 13.
+- Median gap 42 min, 90th percentile 2.2 h, maximum 16.6 h.
+- Implied speed over 50 kn: 0 gaps.
+
+**Known-good check:** the 10 busiest ferries and pilot boats at Bolivar Roads (Galveston–Port Bolivar ferries, pilot boats) are heard all day with **0 gaps** each.
 
 ## 4. What the raw feed looks like (block-1 profile)
 - **Schema:** matches the 2025+ data dictionary, with 17 columns. DuckDB reads `.zst` directly and the timestamps parse as UTC `TIMESTAMP`.

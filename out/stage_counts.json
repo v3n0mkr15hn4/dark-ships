@@ -1,0 +1,12 @@
+{
+  "raw_rows": 7806560,
+  "valid_mmsi_rows": 7801917,
+  "valid_position_rows": 7801917,
+  "dedup_rows": 7800124,
+  "bbox_vessels": 1164,
+  "track_rows": 708414,
+  "universe_rows": 906216,
+  "universe_vessels": 1498,
+  "gaps": 515,
+  "gap_vessels": 142
+}

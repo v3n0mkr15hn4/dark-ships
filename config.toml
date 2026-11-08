@@ -13,6 +13,19 @@ lon_min = -95.60
 lon_max = -93.70
 presence_margin_deg = 0.5                           # universe for the coverage grid = bbox ± margin
 
+[clean]
+mmsi_min = 201000000                                # ship MMSIs: MID 201-775, 9 digits
+mmsi_max = 775999999
+mmsi_denylist = []                                  # extra placeholder MMSIs to drop, if any are found
+
+[gaps]
+k = 10                                              # gap if silence >= max(gap_min_s, k * expected interval)
+gap_min_s = 600
+expected_fast_s = 60                                # moving vessel: 1-min floor from NOAA downsampling
+expected_slow_s = 180                               # anchored / moored / slow: 3-min nominal rate
+class_a_underway_min_kn = 0.5
+class_b_moving_min_kn = 2.0
+
 [duckdb]
 memory_limit = "1GB"                                # laptop had <1 GB free RAM; DuckDB spills to disk
 threads = 4
