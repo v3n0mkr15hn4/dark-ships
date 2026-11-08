@@ -1,0 +1,7 @@
+# raw and intermediate data stay local (raw file is ~228 MB, over GitHub's 100 MB limit)
+data/raw/
+data/interim/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/

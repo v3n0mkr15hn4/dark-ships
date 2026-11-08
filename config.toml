@@ -1,0 +1,18 @@
+# All tunable settings live here. Change a value, rerun `python run.py`.
+
+[data]
+day = "2026-04-15"                                  # UTC day
+raw_file = "data/raw/ais-2026-04-15.csv.zst"
+interim_dir = "data/interim"
+out_dir = "out"
+
+[bbox]                                              # Houston–Galveston approaches
+lat_min = 28.40
+lat_max = 29.90
+lon_min = -95.60
+lon_max = -93.70
+presence_margin_deg = 0.5                           # universe for the coverage grid = bbox ± margin
+
+[duckdb]
+memory_limit = "1GB"                                # laptop had <1 GB free RAM; DuckDB spills to disk
+threads = 4
