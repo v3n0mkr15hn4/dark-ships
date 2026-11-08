@@ -102,5 +102,62 @@ These counts are produced by `python run.py` and written to `out/stage_counts.js
 
 The full 24-hour table is produced by `scripts/profile_day.py`.
 
-## 5–9. Feature dictionary, scoring, label counts, training-set notes, known issues
-*To be written in blocks 3–6.*
+## 5. Scoring rule (frozen before review, git tag `weights-frozen`, config_hash `b0ae721a`)
+
+`score = 100 × (0.35·D + 0.30·C + 0.15·U + 0.10·K + 0.10·T) × Π suppressors`
+
+All values come from `config.toml`; the full definitions are in PLAN.md §6.
+
+**Terms:**
+- **D (duration):** `clip(log10(gap_ratio)/3, 0, 1)`
+- **C (coverage):** `max(coverage_during_gap, 0.5 if heard_today else 0)`
+- **U (underway):** 1 if sog0 ≥ 2 kn and status0 is not anchored or moored, otherwise 0
+- **K (unaccounted time):** `unaccounted_frac`
+- **T (type prior):** 1 for Class A tanker, cargo or fishing; 0.6 for other Class A; 0.3 for Class B or unknown
+
+**Suppressors:**
+
+| Suppressor | Trigger | Factor | Fired on (of 515) |
+|---|---|---|---|
+| Coverage hole | NOT `heard_today` | ×0.2 | 0 |
+| Port, berth or anchorage | (stationary cell AND NOT moving ≥ 2 kn at both ends) OR (anchored/moored at both ends AND moved < 0.5 nm) OR (SOG < 0.5 at both ends) | ×0.2 | 397 |
+| Teleport | implied speed > 50 kn | ×0.3 | 0 |
+| Shared or spoofed MMSI | more than 5% of consecutive pings imply over 50 kn | ×0.1 | 0 |
+
+**Leave-one-out ablation** (top 50 kept when one part is removed; from `out/ablation.csv`):
+
+| Removed | Top 50 kept | Jaccard |
+|---|---|---|
+| U (underway) | 36 | 0.56 |
+| T (type prior) | 36 | 0.56 |
+| Port suppressor | 40 | 0.67 |
+| D (duration) | 42 | 0.72 |
+| K (unaccounted time) | 44 | 0.79 |
+| C (coverage) | 49 | 0.96 |
+| Coverage-hole / teleport / MMSI-conflict suppressors | 50 | 1.00 |
+
+**What the ablation shows (before any labelling):**
+- **Coverage hardly separates events in this box.** 509 of 515 gaps have `coverage_during_gap` = 1, and every gap has `heard_today` = True. Even gaps more than 30 nm offshore score at least 0.8. The box sits inside the 40–50 mile terrestrial range, and traffic is dense enough that another vessel is almost always heard within about 10 nm. So here, coverage is almost never the explanation for a silence.
+  - Caveat: a nearby Class A vessel (12.5 W) being heard does not prove a Class B unit (2 W) would be heard.
+- **The port suppressor is the main false-alarm filter.** It fires on 397 of 515 gaps, mostly Class B leisure boats in marinas.
+
+**Top 50 at freeze:**
+- 23 distinct vessels.
+- By group: fishing 28, cargo 8, pleasure/sail 5, passenger 4, tanker 3, tug/tow 1, other 1.
+- By class: Class A 30, Class B 20.
+- Score at rank 50 is 66.5; rank 51 is 65.4.
+
+## 6. Feature dictionary
+The full table, with formulas and the hypothesis each one tests, is in PLAN.md §5. The `events.parquet` columns are:
+- **Identity:** `event_id` (`{mmsi}_{t0:%Y%m%dT%H%M%S}`), `mmsi`, `vessel_name`, `imo`, `call_sign`, `vessel_type`, `vessel_group`, `transceiver`, `length`
+- **Gap:** `t0`, `t1` (UTC), `gap_s`, `expected_interval_s`, `gap_ratio`
+- **Endpoints:** `lat0/lon0/lat1/lon1`, `sog0/sog1`, `cog0/cog1`, `hdg0/hdg1`, `status0/status1`
+- **Movement:** `dist_nm` (haversine), `implied_kn`, `typical_kn`, `speed_ratio`, `unaccounted_frac`, `max_excursion_nm`, `dcog_deg`
+- **Coverage:** `n_buckets`, `n_buckets_covered`, `coverage_during_gap`, `heard_today`, `cell_density0/1`, `stationary_cell`
+- **Data quality:** `teleport`, `jump_rate`, `mmsi_conflict`
+- **Context:** `n_gaps_vessel`, `hour_utc`, `bbox_edge_nm`, `near_day_boundary`, `p0_in_bbox`, `p1_in_bbox`
+- **Score:** `D, C, U, K, T`, `sup_*` flags, `suppressors`, `suppress_factor`, `score`, `rank`
+- **Provenance:** `config_hash`, `pipeline_version`
+
+## 7–9. Label counts, training-set notes, known issues
+*To be written after the review (blocks 5–6).*

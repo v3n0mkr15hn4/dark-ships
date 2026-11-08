@@ -43,6 +43,13 @@ Deadline: Mon 2026-11-09 12:00 IST (target: submit by 10:00 IST).
 | 29 | 3. Empty water (follow-up) | **C = max(coverage_during_gap, 0.5 if heard_today else 0).** The suppressor fires only when NOT `heard_today`, so the 0.2 threshold is gone. This fixes an inversion where weak coverage during the gap (scored about 12) ranked below no coverage during the gap (about 73). Counterfactuals are now 72.8 and 11.6, and test case 5 gains a monotonicity check. |
 | 30 | 4. Pins | Removed the pinned versions. Block 1 builds a fresh `.venv` and runs a smoke test. Block 2 runs pytest, then `pip freeze > requirements.txt`. If anything fails, fall back to the previous major's last stable minor. `.venv/` is gitignored. |
 
+### Build-time decisions (before weights were frozen, no labels seen)
+
+| # | Change | Why |
+|---|---|---|
+| 31 | The port suppressor's `stationary_cell` rule no longer fires when the ship was moving ≥ 2 kn at **both** ends (`port_moving_min_kn`). | The pre-freeze eyeball found 21 gaps from ships moving at 4–10 kn that were suppressed only because one end lay in a berth or marina cell. A ship moving at both ends is passing through, not parked. Effect: 12 of the top 50 changed, and the top 50 went from 15 to 23 distinct vessels. |
+| 32 | Added `darkships/coverage.py` (not in the §7 layout). | It keeps the presence-grid SQL apart from the per-gap pandas features. |
+
 ---
 
 ## 1. Requirements traceability
@@ -197,7 +204,7 @@ The weights and all thresholds live in `config.toml`.
 | Suppressor | Trigger | Factor |
 |---|---|---|
 | Coverage hole | NOT `heard_today`: no other vessel was heard near p0 or p1 at any time that day, so `coverage_during_gap` is necessarily 0 | ×0.2 (factor in config) |
-| Port, berth or anchorage | `stationary_cell` OR (status ∈ {1,5} at both ends AND dist_nm < 0.5) OR (sog0 < 0.5 AND sog1 < 0.5) | ×0.2 |
+| Port, berth or anchorage | (`stationary_cell` AND NOT sog ≥ 2 kn at both ends) OR (status ∈ {1,5} at both ends AND dist_nm < 0.5) OR (sog0 < 0.5 AND sog1 < 0.5) | ×0.2 |
 | Teleport | `teleport` | ×0.3 |
 | Shared or spoofed MMSI | `mmsi_conflict` | ×0.1 |
 

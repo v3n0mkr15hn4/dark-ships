@@ -46,6 +46,7 @@ t_class_a_other = 0.6                               # T for other Class A
 t_other = 0.3                                       # T for Class B / unknown
 port_max_dist_nm = 0.5                              # anchored/moored both ends AND moved less than this
 port_max_sog_kn = 0.5                               # or near-zero speed at both ends
+port_moving_min_kn = 2.0                            # stationary-cell rule skips ships moving >= this at BOTH ends
 
 [score.weights]
 D = 0.35                                            # duration (log of gap / expected interval)

@@ -9,6 +9,8 @@ score = 100 * (wD*D + wC*C + wU*U + wK*K + wT*T) * product(suppressor factors)
   T  type prior        1 Class A tanker/cargo/fishing, 0.6 other Class A, 0.3 Class B/unknown
 
 Suppressors (known false alarms): coverage hole, port/berth/anchorage, teleport, MMSI conflict.
+  port = (stationary_cell AND NOT moving >= 2 kn at both ends)
+         OR (anchored/moored both ends AND moved < 0.5 nm) OR (sog < 0.5 kn at both ends)
 All weights and thresholds live in config.toml.
 """
 import copy
@@ -48,9 +50,12 @@ def suppressor_flags(df, s):
     """One boolean column per known false-alarm type."""
     anchored_both = df["status0"].isin([1, 5]) & df["status1"].isin([1, 5])
     stopped_both = (df["sog0"] < s["port_max_sog_kn"]) & (df["sog1"] < s["port_max_sog_kn"])
+    # A ship moving at both ends is passing through a berth/anchorage cell, not parked in it.
+    moving_both = (df["sog0"] >= s["port_moving_min_kn"]) & (df["sog1"] >= s["port_moving_min_kn"])
     return pd.DataFrame({
         "coverage_hole": ~df["heard_today"],
-        "port": df["stationary_cell"] | (anchored_both & (df["dist_nm"] < s["port_max_dist_nm"]))
+        "port": (df["stationary_cell"] & ~moving_both)
+                | (anchored_both & (df["dist_nm"] < s["port_max_dist_nm"]))
                 | stopped_both,
         "teleport": df["teleport"],
         "mmsi_conflict": df["mmsi_conflict"],
