@@ -170,7 +170,11 @@ The full table, with formulas and the hypothesis each one tests, is in PLAN.md Â
 **How the labels were made:**
 - **#1** (ACCP 1, rank 1) was labelled directly by the reviewer in the app. Its note was later replaced with the AI evidence text, so all 50 notes have the same style.
 - **The other 49** started as AI suggestions (Claude Opus 5.5) built from numeric evidence, then were reviewed and accepted by the reviewer. Those records carry `label_origin`, `ai_rule` and `ai_confidence` fields.
-- The suggestions and their evidence are kept in `out/ai_suggestions.md` / `.jsonl`.
+- Each label's `note` holds the evidence behind it. `ai_rule` says which rule the suggestion followed:
+  - **R1** `data_artefact`: gap of 15 min or less, steady speed, covered about the distance its speed predicts (short dropout).
+  - **R2** `data_artefact`: an innocent cause is visible (parked or moored, edge of receiver range, or a unit only intermittently received, as shown by isolated single reports).
+  - **R3** `real`: 45 min or more, moving, other vessels within 3 nm heard during the gap, no innocent cause visible.
+  - **R4** `unsure`: everything else, e.g. round trips that could leave coverage, or no neighbours to show reception.
 
 **Precision of the frozen rule** (share labelled `real`):
 
