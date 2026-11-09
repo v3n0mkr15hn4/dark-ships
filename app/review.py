@@ -165,7 +165,8 @@ def main():
     with st.sidebar:
         st.header(f"Reviewed {sum(i in labels for i in ids)} / {len(ids)}")
         st.caption(f"Labels file: {path}")
-        options = [f"#{r.rank}  {r.score:.1f}  {r.vessel_group}  "
+        options = [f"#{r.rank}  {r.score:.1f}  "
+                   f"{'unnamed' if pd.isna(r.vessel_name) else r.vessel_name} ({r.vessel_group})  "
                    f"{'✓ ' + labels[r.event_id]['label'] if r.event_id in labels else '·'}"
                    for r in events.itertuples()]
         pick = st.selectbox("Event", range(len(ids)), index=st.session_state.idx,

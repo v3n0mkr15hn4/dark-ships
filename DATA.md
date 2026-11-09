@@ -1,4 +1,4 @@
-# DATA.md — data card (work in progress)
+# DATA.md — data card
 
 ## 1. Source
 - MarineCadastre / NOAA Office for Coastal Management, Nationwide AIS, from USCG NAIS terrestrial receivers.
@@ -33,7 +33,7 @@ These counts are produced by `python run.py` and written to `out/stage_counts.js
 | Their full national-day tracks | 708,414 | 1,164 | |
 | Presence universe (all vessels, bbox ± 0.5°) | 906,216 | 1,498 | |
 | Gaps (K = 10, ≥1 endpoint in the bbox) | 515 | 142 | |
-| *Top 50 and labels: blocks 3–5* | | | |
+| Top 50 by score, reviewed and labelled | 50 | 23 | |
 
 **Gap-threshold sensitivity** (same tracks, gap if ≥ max(600 s, K × E)):
 
@@ -159,5 +159,66 @@ The full table, with formulas and the hypothesis each one tests, is in PLAN.md �
 - **Score:** `D, C, U, K, T`, `sup_*` flags, `suppressors`, `suppress_factor`, `score`, `rank`
 - **Provenance:** `config_hash`, `pipeline_version`
 
-## 7–9. Label counts, training-set notes, known issues
-*To be written after the review (blocks 5–6).*
+## 7. Labels (`out/labels.jsonl`, 50 events)
+
+| Label | Count |
+|---|---|
+| real | **6** |
+| data_artefact | **34** |
+| unsure | **10** |
+
+**How the labels were made:**
+- **#1** (ACCP 1, rank 1) was labelled directly by the reviewer in the app.
+- **The other 49** started as AI suggestions (Claude Opus 5.5) built from numeric evidence, then were reviewed and accepted by the reviewer. Those records carry `label_origin`, `ai_rule` and `ai_confidence` fields.
+- The suggestions and their evidence are kept in `out/ai_suggestions.md` / `.jsonl`.
+
+**Precision of the frozen rule** (share labelled `real`):
+
+| Top k | real | real + unsure |
+|---|---|---|
+| 10 | 0.40 | 0.70 |
+| 25 | 0.24 | 0.44 |
+| 50 | 0.12 | 0.32 |
+
+**Real events:** only two vessels.
+- MORNING LORD (Class A shrimp trawler, East Bay): 5 events, silences of 52 min to 2.2 h while trawling, with Class B boats within 3 nm still heard.
+- ACCP 1 (fast 9 m Class B boat): 1 event, 11.9 h silent on a round trip through a well-covered channel.
+
+**False alarms (34 `data_artefact`) by cause:**
+
+| Cause | Events |
+|---|---|
+| Unit on but only intermittently received: isolated single reports, or poorly received all day even while moving | 16 |
+| Short dropout (15 min or less) during steady motion; covered the expected distance | 13 |
+| Parked or moored, or coming to rest, across the gap | 4 |
+| Edge of receiver range offshore | 1 |
+
+**By transceiver class:**
+
+| Class | real | data_artefact | unsure |
+|---|---|---|---|
+| A | 5 | 24 | 1 |
+| B | 1 | 10 | 9 |
+
+## 8. Training-set notes
+- **Keys:** `event_id` = `{mmsi}_{t0:%Y%m%dT%H%M%S}` joins `labels.jsonl` to `events.parquet`. `config_hash` (`b0ae721a`) pins the thresholds and weights that produced each event.
+- **Duplicate records:** `labels.jsonl` is append-only. If an event_id appears more than once, the last line wins.
+- **Label semantics (agreed with RSKD):**
+  - `real` = the ship went dark while its area was reachable (other vessels nearby were heard during the gap) and no innocent cause is visible. This is a **presumption of intent, not proof**.
+  - `data_artefact` = an innocent cause is visible: reception, parked or moored, coverage edge, short dropout.
+  - `unsure` = one day of data cannot decide.
+- **Known biases:**
+  - **Selection bias:** labels exist only for the rule's top 50, so they say nothing about recall.
+  - **One reviewer, AI-assisted:** 49 of 50 labels started as AI suggestions, so the AI's reasoning patterns can be inherited.
+  - **Clustered events:** 23 distinct vessels; one vessel (MORNING LORD) supplies 9 events and all 5 of its `real` labels come from the same trawl pattern.
+  - **Limited coverage:** terrestrial receivers only; one day; one region.
+  - **Labels saw the rule:** labels were made while looking at the rule's own features.
+
+## 9. Known issues and limitations
+- **Gaps need a report on both sides.** Vessels that go dark and never return within the day, or first appear mid-box, are missed. The day+1 and day−1 files would fix this.
+- **Coverage cells are too coarse here.** `coverage_during_gap` uses 0.1° cells, about 18 nm across with neighbours, and is 1.0 for 509 of 515 gaps. Labelling therefore relied on a finer check: other vessels heard within 3 nm. A Class B-specific check would be better still, since Class B units transmit 2 W against Class A's 12.5 W.
+- **GPS speed noise beats the port rule.** The moving-ship exception added in block 3 relies on speed at both ends. A moored boat reporting 2.4 kn of GPS noise (A-TEAM, #24) escaped the port suppressor. LONGHORN's silence at its spot scored rank 2 or rank 157 depending only on the speeds caught at the two ends.
+- **Episodes are not merged.** ACCP 1's single episode appears twice (#50 then #1, split by one isolated report).
+- **No per-vessel reception baseline.** The most common false alarm is a unit that is on but poorly received ("flicker"). The scoring rule doesn't model it.
+- **Excel can't open the raw file.** The raw CSV (7.8 M rows) is about 7× Excel's row limit, so checks in Excel silently miss most of the day. Use DuckDB, as in `scripts/profile_day.py`.
+- **Planned report script not built.** `report.py` (automatic DATA.md tables) was cut for time; the label tables above were computed once and pasted in.
