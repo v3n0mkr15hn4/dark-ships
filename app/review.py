@@ -1,8 +1,10 @@
-"""Review page: one gap event at a time, map + context, label real / data_artefact / unsure.
+"""Review app with two pages:
+  Dashboard      - results overview from out/events.parquet + out/labels.jsonl (app/dashboard.py)
+  Review events  - one gap event at a time, map + context, label real / data_artefact / unsure
 
 Run from the repo root:   streamlit run app/review.py
 Use another labels file:  streamlit run app/review.py -- --labels path/to/labels.jsonl
-Labels are appended to out/labels.jsonl; on restart the page resumes at the first unlabelled event.
+Labels are appended to out/labels.jsonl; the review page resumes at the first unlabelled event.
 """
 import argparse
 import sys
@@ -17,6 +19,7 @@ import streamlit as st
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+import dashboard  # noqa: E402  (app/dashboard.py, same folder)
 from darkships.labels import LABELS, append_label, first_unlabelled, load_labels  # noqa: E402
 
 TOP_N = 50
@@ -40,8 +43,12 @@ def labels_path():
 
 
 @st.cache_data
+def load_all_events():
+    return pd.read_parquet(EVENTS).sort_values("rank").reset_index(drop=True)
+
+
 def load_events(n):
-    return pd.read_parquet(EVENTS).sort_values("rank").head(n).reset_index(drop=True)
+    return load_all_events().head(n).reset_index(drop=True)
 
 
 @st.cache_data
@@ -151,8 +158,7 @@ def feature_card(ev):
                 f"{ev.suppress_factor:.2f}   ·   suppressors: {ev.suppressors or 'none'}")
 
 
-def main():
-    st.set_page_config(page_title="Dark-ship review", layout="wide")
+def review_page():
     path = labels_path()
     events = load_events(TOP_N)
     ids = events.event_id.tolist()
@@ -184,6 +190,13 @@ def main():
     st.subheader(f"#{ev['rank']} · {name} · MMSI {ev.mmsi} · "
                  f"{ev.vessel_group} · Class {ev.transceiver} · {num(ev.length, '{:.0f}')} m")
     st.caption(f"event_id {ev.event_id}")
+    current = labels.get(ev.event_id, {})
+    if current:
+        badge = {"real": "orange", "unsure": "green", "data_artefact": "blue"}[current["label"]]
+        st.badge(f"Saved label: {dashboard.LABEL_NAME[current['label']]}", color=badge)
+        st.markdown(f"**Note:** {current.get('note', '')}")
+    else:
+        st.badge("Not labelled yet", color="gray")
 
     track = load_track(ev.mmsi)
     cov = load_coverage_pings(ev.mmsi, ev.t0.tz_localize(None), ev.t1.tz_localize(None),
@@ -195,8 +208,8 @@ def main():
                f"({len(cov):,} pings, {len(shown):,} drawn)")
     feature_card(ev)
 
-    current = labels.get(ev.event_id, {})
     with st.form(key=f"form_{ev.event_id}"):
+        st.markdown("**Change label**" if current else "**Label this event**")
         label = st.radio("Label", LABELS, horizontal=True,
                          index=LABELS.index(current["label"]) if current else None)
         note = st.text_input("One-line note", value=current.get("note", ""))
@@ -219,4 +232,17 @@ def main():
                 st.rerun()
 
 
-main()
+def dashboard_page():
+    dashboard.render(load_all_events(), load_events(TOP_N), load_labels(labels_path()), CFG, open_event)
+
+
+def open_event(i):
+    """Jump from the dashboard to the review page at top-50 index i."""
+    st.session_state.idx = i
+    st.switch_page(REVIEW_PAGE)
+
+
+st.set_page_config(page_title="Dark-ship review", layout="wide")
+DASHBOARD_PAGE = st.Page(dashboard_page, title="Dashboard", icon=":material/insights:", default=True)
+REVIEW_PAGE = st.Page(review_page, title="Review events", icon=":material/fact_check:")
+st.navigation([DASHBOARD_PAGE, REVIEW_PAGE]).run()

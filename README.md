@@ -8,9 +8,21 @@
 scripts/download.ps1                         # downloads the raw file into data/raw/ (not in git)
 python -m venv .venv; .venv\Scripts\Activate.ps1; pip install -r requirements.txt
 python run.py --config config.toml           # one command: raw -> events.parquet (~1 min first run, ~15 s after)
-streamlit run app/review.py                  # review page; labels -> out/labels.jsonl
+streamlit run app/review.py                  # Dashboard + Review events pages; labels -> out/labels.jsonl
 python -m pytest                             # 13 tests
 ```
+
+**The app has two pages:**
+- **Dashboard** (opens first) summarises the results from `events.parquet` and `labels.jsonl`:
+  - label counts;
+  - labels by vessel type and by rank;
+  - a map of all top-50 gaps;
+  - the rule behind each label;
+  - precision at 10, 25 and 50;
+  - a filterable table where you can select a row to open it.
+- **Review events** shows one event at a time: tracks before and after the gap, coverage pings, the saved label and its note, and a form to change the label.
+
+The Review page needs `data/interim/` from `run.py`. The Dashboard needs only `out/`.
 
 **Outputs:**
 - `out/events.parquet`: all 515 gaps with features.
