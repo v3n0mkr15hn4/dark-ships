@@ -168,7 +168,7 @@ The full table, with formulas and the hypothesis each one tests, is in PLAN.md Â
 | unsure | **10** |
 
 **How the labels were made:**
-- **#1** (ACCP 1, rank 1) was labelled directly by the reviewer in the app.
+- **#1** (ACCP 1, rank 1) was labelled directly by the reviewer in the app. Its note was later replaced with the AI evidence text, so all 50 notes have the same style.
 - **The other 49** started as AI suggestions (Claude Opus 5.5) built from numeric evidence, then were reviewed and accepted by the reviewer. Those records carry `label_origin`, `ai_rule` and `ai_confidence` fields.
 - The suggestions and their evidence are kept in `out/ai_suggestions.md` / `.jsonl`.
 
